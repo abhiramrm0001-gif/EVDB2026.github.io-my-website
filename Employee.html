@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Portal | Slate</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+    :root {
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --bg-app: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --nav-bg: #111827;
+      --success: #10b981;
+    }
+
+    body { 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+      background-color: var(--bg-app);
+      color: var(--text-main);
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Navigation */
+    .top-nav {
+      background: var(--nav-bg);
+      padding: 12px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: white;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand .dot { height: 8px; width: 8px; background: var(--accent); border-radius: 50%; }
+    .nav-buttons { display: flex; gap: 8px; }
+
+    .btn-nav {
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-nav:hover { color: white; background: rgba(255,255,255,0.05); }
+    .btn-nav.active { color: white; background: rgba(255,255,255,0.1); }
+
+    /* Main Content */
+    main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    header {
+      margin-bottom: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-shrink: 0;
+      gap: 20px;
+    }
+
+    .header-title h2 { margin: 0; font-size: 1.8rem; font-weight: 700; }
+    .header-title span { color: var(--text-muted); font-size: 0.95rem; }
+
+    .actions-row { display: flex; gap: 12px; align-items: center; }
+    
+    .input-group {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 12px;
+      display: flex;
+      align-items: center;
+    }
+
+    input {
+      border: none;
+      background: transparent;
+      padding: 8px;
+      outline: none;
+      font-family: inherit;
+      width: 200px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    /* Sticky Table */
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      overflow-y: auto;
+      position: relative;
+      flex: 1;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: 80px 2fr 1fr 100px;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: white;
+    }
+
+    .table-header { 
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #f8fafc; 
+      font-weight: 600; 
+      font-size: 0.8rem; 
+      text-transform: uppercase; 
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--border);
+    }
+
+    .emp-avatar {
+      width: 40px; height: 40px;
+      background: #e2e8f0;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700; color: #475569;
+    }
+
+    .badge {
+      padding: 4px 10px; border-radius: 20px; font-size: 0.75rem;
+      font-weight: 600; background: #ecfdf5; color: #10b981;
+    }
+
+    .btn-action {
+      background: transparent; border: none; color: #94a3b8;
+      cursor: pointer; padding: 8px; border-radius: 6px; transition: 0.2s;
+    }
+    .btn-action:hover { color: #ef4444; background: #fee2e2; }
+
+    /* Frozen JSON Modal Styling */
+    #jsonModal {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center; z-index: 200;
+    }
+
+    .json-content {
+      background: white;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 85vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden; 
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .json-header {
+      padding: 24px 32px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .json-body {
+      padding: 24px 32px;
+      overflow-y: auto;
+      flex: 1;
+      background: #f8fafc;
+    }
+
+    pre {
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 20px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      white-space: pre-wrap;
+      margin: 0;
+    }
+
+    #modalOverlay {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center; z-index: 200;
+    }
+    .modal { background: white; padding: 32px; border-radius: 16px; width: 90%; max-width: 400px; }
+
+    .status-pill {
+      position: fixed; bottom: 20px; right: 20px;
+      padding: 8px 16px; background: white;
+      border: 1px solid var(--border);
+      border-radius: 20px; font-size: 0.75rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 50;
+    }
+
+    /* Success Toast Styling */
+    .toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      background: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      border-left: 4px solid var(--success);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transform: translateX(150%);
+      transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      z-index: 300;
+    }
+    .toast.show { transform: translateX(0); }
+    .toast-icon { 
+        color: var(--success); 
+        background: #ecfdf5; 
+        border-radius: 50%; 
+        width: 24px; height: 24px; 
+        display: flex; align-items: center; justify-content: center;
+        font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="successToast" class="toast">
+    <div class="toast-icon">✓</div>
+    <div>
+        <div style="font-weight: 600;">Success</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">Employee data saved successfully.</div>
+    </div>
+  </div>
+
+  <nav class="top-nav">
+    <div class="brand"><div class="dot"></div>EV Dashboard</div>
+    <div class="nav-buttons">
+      <button class="btn-nav" onclick="window.location.href='index.html'">Home</button>
+      <button class="btn-nav active">EV Team</button>
+      <button class="btn-nav" onclick="window.location.href='graphs.html'">Analytics</button>
+      <button class="btn-nav" onclick="showRawJson()">Raw JSON</button>
+    </div>
+  </nav>
+
+  <main>
+    <header>
+      <div class="header-title">
+        <h2>Employee Directory</h2>
+        <span id="count">0 total employees</span>
+      </div>
+      
+      <div class="actions-row">
+        <div class="input-group">
+          <input type="text" id="searchInput" placeholder="Search directory..." onkeyup="filterGrid()">
+        </div>
+        
+        <form id="addForm" style="display: flex; gap: 12px;">
+          <div class="input-group">
+            <input id="fullName" type="text" placeholder="New employee name..." required />
+          </div>
+          <button type="submit" class="btn-primary">Add Member</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="table-container">
+      <div class="table-row table-header">
+        <div>Profile</div>
+        <div>Full Name</div>
+        <div>Status</div>
+        <div>Action</div>
+      </div>
+      <div id="employeeGrid"></div>
+    </div>
+  </main>
+
+  <div id="status" class="status-pill">Syncing...</div>
+
+  <div id="modalOverlay">
+    <div class="modal">
+      <h3 style="margin-top:0">Remove Member</h3>
+      <p id="modalText"></p>
+      <div style="display: flex; gap: 12px; margin-top: 24px;">
+        <button class="btn-primary" id="confirmDeleteBtn" style="background: #ef4444; flex: 1;">Delete</button>
+        <button class="btn-primary" onclick="closeModal()" style="background: #f1f5f9; color: #475569; flex: 1;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="jsonModal">
+    <div class="json-content">
+      <div class="json-header">
+        <h3 style="margin: 0;">Database Export</h3>
+        <button class="btn-primary" onclick="closeJsonModal()" style="background: #64748b; padding: 8px 16px;">Close Window</button>
+      </div>
+      <div class="json-body">
+        <pre id="jsonDisplay"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const gridContainer = document.getElementById('employeeGrid');
+    const countEl = document.getElementById('count');
+    const modal = document.getElementById('modalOverlay');
+    const jsonModal = document.getElementById('jsonModal');
+    const toast = document.getElementById('successToast');
+    
+    let model = {};
+    let pendingDeleteName = null;
+
+    async function loadData() {
+      try {
+        const res = await fetch('data.json', { cache: 'no-store' });
+        model = await res.json();
+        renderGrid();
+        statusEl.textContent = '● System Online';
+      } catch (err) { statusEl.textContent = '○ Connection Error'; }
+    }
+
+    function renderGrid(filter = '') {
+      gridContainer.innerHTML = '';
+      const names = Object.keys(model)
+        .filter(n => n.toLowerCase().includes(filter.toLowerCase()))
+        .sort((a, b) => a.localeCompare(b));
+      
+      countEl.textContent = `${names.length} total employees`;
+
+      names.forEach((name) => {
+        const row = document.createElement('div');
+        row.className = 'table-row';
+        row.innerHTML = `
+          <div class="emp-avatar">${name.substring(0,2).toUpperCase()}</div>
+          <div style="font-weight: 600;">${name}</div>
+          <div><span class="badge">Active</span></div>
+          <button class="btn-action" onclick="openModal('${name.replace(/'/g, "\\'")}')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+          </button>
+        `;
+        gridContainer.appendChild(row);
+      });
+    }
+
+    function filterGrid() {
+      const val = document.getElementById('searchInput').value;
+      renderGrid(val);
+    }
+
+    function openModal(name) {
+      pendingDeleteName = name;
+      document.getElementById('modalText').textContent = `Remove ${name}? This cannot be undone.`;
+      modal.style.display = 'flex';
+    }
+
+    function closeModal() { modal.style.display = 'none'; }
+    function showRawJson() {
+      document.getElementById('jsonDisplay').textContent = JSON.stringify(model, null, 4);
+      jsonModal.style.display = 'flex';
+    }
+    function closeJsonModal() { jsonModal.style.display = 'none'; }
+
+    document.getElementById('confirmDeleteBtn').onclick = () => {
+      if (pendingDeleteName) {
+        delete model[pendingDeleteName];
+        closeModal();
+        renderGrid();
+        saveData();
+      }
+    };
+
+    function showToast() {
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    async function saveData(isNewEmployee = false) {
+      try {
+        await fetch('/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(model)
+        });
+        statusEl.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
+        if(isNewEmployee) showToast();
+      } catch (err) { statusEl.textContent = 'Save failed'; }
+    }
+
+    document.getElementById('addForm').onsubmit = (e) => {
+      e.preventDefault();
+      const name = document.getElementById('fullName').value.trim();
+      if (!name || model[name]) return;
+
+      const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      model[name] = months.map(month => ({
+        "Month": month, "Quality(%)": 0, "Extra Processed counts": 0, "Leaves": "",
+        "Pending(whole month)": "", "Days below benchmark(98%)": "",
+        "Number of days reached minimum count at 6pm": "", "Avg 6pm count": "",
+        "Take away points": "", "Remarks": ""
+      }));
+
+      e.target.reset();
+      renderGrid();
+      saveData(true); // Pass true to trigger the popup
+    };
+
+    loadData();
+  </script>
+</body>
+</html>

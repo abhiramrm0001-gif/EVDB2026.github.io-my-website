@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Full Database View</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        body { font-family: 'Sora', sans-serif; background: #f8fafc; padding: 40px; color: #0f172a; }
+        .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 30px; gap: 20px; }
+        h1 { margin: 0; font-weight: 800; letter-spacing: -0.04em; }
+        
+        .action-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+        .filters { display: flex; gap: 15px; align-items: center; background: white; padding: 10px 20px; border-radius: 15px; border: 1px solid #e2e8f0; }
+        .filter-item { display: flex; align-items: center; gap: 8px; }
+        .filter-label { font-size: 0.7rem; font-weight: 700; color: #64748b; text-transform: uppercase; }
+        
+        select { 
+            padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0; 
+            font-family: 'Sora'; font-weight: 600; cursor: pointer; outline: none;
+            background-color: #f1f5f9; color: #2563eb; font-size: 0.8rem;
+        }
+
+        .btn { 
+            padding: 10px 20px; border-radius: 10px; cursor: pointer; 
+            border: none; font-family: 'Sora'; font-weight: 600; 
+            display: inline-flex; align-items: center; gap: 8px;
+            transition: all 0.2s ease; text-decoration: none; font-size: 0.85rem;
+        }
+
+        .btn-export { background: #10b981; color: white; }
+        .btn-export:hover { background: #059669; transform: translateY(-1px); }
+
+        .btn-raw { background: #64748b; color: white; }
+        .btn-raw:hover { background: #475569; }
+
+        /* Dashboard button styling - moved to right end */
+        .btn-dashboard { background: #ffffff; color: #2563eb; border: 1px solid #e2e8f0; }
+        .btn-dashboard:hover { background: #eff6ff; border-color: #2563eb; transform: translateX(2px); }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(4px);
+            display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content {
+            background: #1e293b; color: #f1f5f9; width: 85%; max-width: 900px;
+            max-height: 85vh; border-radius: 20px; padding: 30px; position: relative;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 15px; gap: 10px; }
+        
+        .nav-group { display: flex; gap: 8px; }
+        .btn-nav { background: #334155; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .btn-nav:hover { background: #475569; }
+
+        .modal-close-btn { background: #ef4444; color: white; border: none; padding: 6px 15px; border-radius: 8px; cursor: pointer; font-family: 'Sora'; font-weight: 600; font-size: 0.8rem; }
+        
+        #jsonDisplay { 
+            overflow: auto; flex-grow: 1; font-size: 0.85rem; line-height: 1.5; color: #cbd5e1; 
+            background: #0f172a; padding: 20px; border-radius: 12px; scroll-behavior: smooth;
+        }
+
+        .table-card { 
+            background: white; border-radius: 20px; border: 1px solid #e2e8f0; 
+            overflow: auto; max-height: 70vh; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 1100px; }
+        th { 
+            background: #f1f5f9; padding: 15px; text-align: left; color: #64748b; font-size: 0.65rem; 
+            text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; z-index: 10;
+            box-shadow: 0 1px 0 #e2e8f0;
+        }
+        td { padding: 15px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+        .emp-name-tag { font-weight: 800; color: #2563eb; background: #eff6ff; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; }
+        .month-tag { font-weight: 700; color: #6366f1; }
+        .no-data { padding: 60px; text-align: center; color: #94a3b8; font-weight: 600; background: white; border-radius: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="jsonModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <h3 style="margin:0; font-size: 1rem;">Raw Database JSON</h3>
+                    <div class="nav-group">
+                        <button class="btn-nav" onclick="scrollJson('top')"><i data-lucide="arrow-up" style="width:12px; display:inline; vertical-align:middle"></i> Home</button>
+                        <button class="btn-nav" onclick="scrollJson('bottom')"><i data-lucide="arrow-down" style="width:12px; display:inline; vertical-align:middle"></i> End</button>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeModal()">Close</button>
+            </div>
+            <pre id="jsonDisplay"></pre>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>Database <span style="color: #2563eb;">Explorer</span></h1>
+        
+        <div class="action-group">
+            <div class="filters">
+                <div class="filter-item">
+                    <span class="filter-label">User:</span>
+                    <select id="empFilter" onchange="applyFilters()">
+                        <option value="all">All Employees</option>
+                    </select>
+                </div>
+                <div style="width: 1px; height: 20px; background: #e2e8f0;"></div>
+                <div class="filter-item">
+                    <span class="filter-label">Month:</span>
+                    <select id="monthFilter" onchange="applyFilters()">
+                        <option value="all">Full Year</option>
+                        <option value="January">January</option><option value="February">February</option>
+                        <option value="March">March</option><option value="April">April</option>
+                        <option value="May">May</option><option value="June">June</option>
+                        <option value="July">July</option><option value="August">August</option>
+                        <option value="September">September</option><option value="October">October</option>
+                        <option value="November">November</option><option value="December">December</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button onclick="openModal()" class="btn btn-raw">
+                <i data-lucide="code" style="width:18px"></i>
+            </button>
+
+            <button onclick="exportToExcel()" class="btn btn-export">
+                <i data-lucide="file-spreadsheet" style="width:18px"></i> Export Excel
+            </button>
+
+            <a href="index.html" class="btn btn-dashboard">
+                <i data-lucide="layout-dashboard" style="width:18px"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <table id="dataTable">
+            <thead><tr id="tableHeader"></tr></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div id="emptyState" class="no-data" style="display:none;">
+        <i data-lucide="search-x" style="width: 48px; height: 48px; margin-bottom: 10px; stroke-width: 1;"></i>
+        <br>No matching records found for this selection.
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let cachedData = {};
+
+        async function loadDatabase() {
+            try {
+                const res = await fetch('data.json?t=' + Date.now());
+                cachedData = await res.json();
+                populateEmployeeDropdown();
+                applyFilters();
+            } catch (err) {
+                console.error("Error:", err);
+            }
+        }
+
+        function populateEmployeeDropdown() {
+            const select = document.getElementById('empFilter');
+            Object.keys(cachedData).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                select.appendChild(opt);
+            });
+        }
+
+        function applyFilters() {
+            const empFilter = document.getElementById('empFilter').value;
+            const monthFilter = document.getElementById('monthFilter').value;
+            const tableBody = document.getElementById('tableBody');
+            const tableHeader = document.getElementById('tableHeader');
+            const emptyState = document.getElementById('emptyState');
+            
+            tableBody.innerHTML = "";
+            let headersSet = false;
+            let rowCount = 0;
+
+            for (const employee in cachedData) {
+                if (empFilter !== 'all' && empFilter !== employee) continue;
+                cachedData[employee].forEach(record => {
+                    if (monthFilter !== 'all' && record.Month.trim() !== monthFilter) return;
+                    if (!headersSet) {
+                        let hHtml = `<th>Employee</th>`;
+                        Object.keys(record).forEach(key => hHtml += `<th>${key}</th>`);
+                        tableHeader.innerHTML = hHtml;
+                        headersSet = true;
+                    }
+                    let rHtml = `<tr><td><span class="emp-name-tag">${employee}</span></td>`;
+                    Object.entries(record).forEach(([key, val]) => {
+                        const style = key === 'Month' ? 'class="month-tag"' : '';
+                        rHtml += `<td ${style}>${val}</td>`;
+                    });
+                    rHtml += `</tr>`;
+                    tableBody.innerHTML += rHtml;
+                    rowCount++;
+                });
+            }
+            document.getElementById('dataTable').style.display = rowCount === 0 ? 'none' : 'table';
+            emptyState.style.display = rowCount === 0 ? 'block' : 'none';
+            if (rowCount === 0) lucide.createIcons();
+        }
+
+        function openModal() {
+            document.getElementById('jsonDisplay').textContent = JSON.stringify(cachedData, null, 4);
+            document.getElementById('jsonModal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            document.getElementById('jsonModal').style.display = 'none';
+        }
+
+        function scrollJson(direction) {
+            const display = document.getElementById('jsonDisplay');
+            if (direction === 'top') {
+                display.scrollTop = 0;
+            } else {
+                display.scrollTop = display.scrollHeight;
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('jsonModal');
+            if (event.target == modal) closeModal();
+        }
+
+        function exportToExcel() {
+            const table = document.getElementById("dataTable");
+            const emp = document.getElementById('empFilter').value;
+            const mon = document.getElementById('monthFilter').value;
+            const fileName = `EV_Report_${emp}_${mon}.xlsx`;
+            const wb = XLSX.utils.table_to_book(table, { sheet: "Performance" });
+            XLSX.writeFile(wb, fileName);
+        }
+
+        loadDatabase();
+    </script>
+</body>
+</html>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Employee Data</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --danger: #ef4444;
+            --success: #10b981;
+            --bg: #f8fafc;
+            --text: #0f172a;
+            --border: #e2e8f0;
+        }
+
+        body { font-family: 'Sora', sans-serif; background: var(--bg); padding: 10px 25px; color: var(--text); margin: 0; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .header-actions { display: flex; gap: 10px; }
+        
+        .btn-dashboard { 
+            background: white; border: 1px solid var(--border); padding: 8px 15px; border-radius: 10px; 
+            color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.8rem; 
+            display: flex; align-items: center; gap: 8px; transition: all 0.2s; cursor: pointer;
+        }
+        .btn-dashboard:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); color: var(--primary); }
+        .btn-dashboard:disabled { opacity: 0.6; cursor: not-allowed; }
+        
+        .btn-clear-all { border-color: #fecaca; color: var(--danger); }
+        .btn-clear-all:hover { color: white; background: var(--danger); border-color: var(--danger); }
+
+        .spinning { animation: rotate 0.8s ease-in-out; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .selector-card { background: white; padding: 10px 20px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; display: flex; gap: 15px; align-items: center; }
+        select { padding: 6px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: 'Sora'; font-weight: 600; width: 220px; outline: none; }
+        
+        .table-card { background: white; border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.72rem; table-layout: fixed; min-width: 1100px; }
+        
+        /* Fixed Column Widths for alignment */
+        th:nth-child(1) { width: 90px; padding-left: 20px; } /* Month */
+        th:nth-child(2) { width: 70px; } /* Quality */
+        th:nth-child(3) { width: 80px; } /* Days Below 98% */
+        th:nth-child(4) { width: 60px; } /* Extra */
+        th:nth-child(5) { width: 60px; } /* Leaves */
+        th:nth-child(6) { width: 70px; } /* Pending */
+        th:nth-child(7) { width: 70px; } /* 6PM Hit */
+        th:nth-child(8) { width: 70px; } /* Avg 6PM */
+        th:nth-child(9) { width: 130px; } /* Remarks */
+        th:nth-child(10) { width: 130px; } /* Takeaway */
+        th:last-child { width: 110px; padding-right: 20px; } /* Actions */
+
+        th { background: #f1f5f9; padding: 12px 5px; text-align: left; color: #64748b; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        
+        td { 
+            padding: 8px 5px; 
+            border-bottom: 1px solid #f1f5f9; 
+            vertical-align: middle; 
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        td:first-child { padding-left: 20px; font-weight: 700; color: var(--primary); }
+        td:last-child { padding-right: 20px; text-align: center; overflow: visible; }
+
+        .btn-container { display: flex; gap: 4px; justify-content: center; }
+        
+        .btn-edit { background: var(--primary); color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-family: 'Sora'; font-size: 0.65rem; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+        .btn-edit:disabled { opacity: 0.7; cursor: not-allowed; }
+        .btn-clear { background: #f1f5f9; color: #64748b; border: 1px solid var(--border); padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+        .btn-undo-action { background: #ecfdf5; color: var(--success); border: 1px solid #a7f3d0; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+
+        #confirmModal, #editModal, #confirmAllModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-content, .edit-box { background: white; padding: 25px; border-radius: 20px; width: 380px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .form-row { margin-bottom: 8px; }
+        .form-row label { display: block; font-size: 0.65rem; font-weight: 700; color: #64748b; margin-bottom: 2px; }
+        .form-row input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); font-family: 'Sora'; font-size: 0.8rem; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div><h2 style="margin: 0; font-size: 1.2rem;">Manage <span style="color:var(--primary)">Records</span></h2></div>
+        <div class="header-actions">
+            <button onclick="askClearAll()" class="btn-dashboard btn-clear-all" id="clearAllBtn">
+                <i data-lucide="trash-2" style="width:14px"></i> Clear All Records
+            </button>
+            <button onclick="init()" class="btn-dashboard" id="syncBtn">
+                <i data-lucide="refresh-cw" id="syncIcon" style="width:14px"></i> Sync Data
+            </button>
+            <a href="index.html" class="btn-dashboard">
+                <i data-lucide="layout-dashboard" style="width:14px"></i> Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="selector-card">
+        <i data-lucide="user-cog" style="color:var(--primary); width:18px"></i>
+        <select id="employeeSelect" onchange="loadEmployeeTable()">
+            <option value="">Choose Employee...</option>
+        </select>
+    </div>
+
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Quality</th>
+                    <th>Below 98%</th>
+                    <th>Extra</th>
+                    <th>Leaves</th>
+                    <th>Pending</th>
+                    <th>6PM Hit</th>
+                    <th>Avg 6PM</th>
+                    <th>Remarks</th>
+                    <th>Takeaway</th>
+                    <th style="text-align:center">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="manageTableBody">
+                <tr><td colspan="11" style="text-align:center; padding:40px; color:#94a3b8;">Select an employee to manage their data.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="confirmModal">
+        <div class="modal-content">
+            <h3 style="margin:0;">Clear Month?</h3>
+            <p style="font-size: 0.8rem; color: #64748b;" id="targetName"></p>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-dashboard" style="flex:1" onclick="closeModal('confirmModal')">Cancel</button>
+                <button class="btn-edit" style="flex:1; background:var(--danger); justify-content:center" id="executeClear">Yes, Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmAllModal">
+        <div class="modal-content">
+            <h3 style="margin:0; color:var(--danger)">Clear All Data?</h3>
+            <p style="font-size: 0.8rem; color: #64748b;">This will wipe data for ALL months for the selected employee.</p>
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn-dashboard" style="flex:1" onclick="closeModal('confirmAllModal')">Cancel</button>
+                <button class="btn-edit" style="flex:1; background:var(--danger); justify-content:center" id="executeClearAll">Confirm Wipe</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal">
+        <div class="edit-box">
+            <h3 id="editTitle" style="margin-top:0; font-size:1rem;">Edit Record</h3>
+            <form id="editForm">
+                <input type="hidden" id="editMonth">
+                <div class="form-row"><label>Quality (%)</label><input type="number" step="0.01" min="0" max="100" id="f1"></div>
+                <div class="form-row"><label>Days below benchmark(98%)</label><input type="number" min="0" id="f_below"></div>
+                <div class="form-row"><label>Extra Count</label><input type="number" min="0" id="f2"></div>
+                <div class="form-row"><label>Leaves</label><input type="number" min="0" id="f3"></div>
+                <div class="form-row"><label>Pending</label><input type="number" min="0" id="f4"></div>
+                <div class="form-row"><label>6PM Success</label><input type="number" min="0" id="f5"></div>
+                <div class="form-row"><label>Avg 6PM</label><input type="number" step="0.01" min="0" id="f6"></div>
+                <div class="form-row"><label>Remarks</label><input type="text" id="f7"></div>
+                <div class="form-row"><label>Take away points</label><input type="text" id="f8"></div>
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button type="button" class="btn-dashboard" style="flex:1" onclick="closeModal('editModal')">Cancel</button>
+                    <button type="submit" id="updateBtn" class="btn-edit" style="flex:2; justify-content:center">Update Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let database = {};
+        let undoStack = {}; 
+        const monthOrder = { "January":1, "February":2, "March":3, "April":4, "May":5, "June":6, "July":7, "August":8, "September":9, "October":10, "November":11, "December":12 };
+
+        async function init() {
+            const syncIcon = document.getElementById('syncIcon');
+            syncIcon.classList.add('spinning');
+            try {
+                const res = await fetch('data.json?t=' + Date.now());
+                if (!res.ok) throw new Error("Failed to load data");
+                database = await res.json();
+                const select = document.getElementById('employeeSelect');
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">Choose Employee...</option>';
+                Object.keys(database).sort().forEach(n => select.add(new Option(n, n)));
+                if (currentVal && database[currentVal]) {
+                    select.value = currentVal;
+                    loadEmployeeTable();
+                }
+                lucide.createIcons();
+            } catch (e) { 
+                alert("Error connecting to database.");
+            }
+            finally { setTimeout(() => syncIcon.classList.remove('spinning'), 800); }
+        }
+
+        function loadEmployeeTable() {
+            const name = document.getElementById('employeeSelect').value;
+            const tbody = document.getElementById('manageTableBody');
+            if (!name) {
+                tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:40px; color:#94a3b8;">Select an employee.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = "";
+            const display = (v, isPct = false) => (v === 0 || v === "0" || v === "" || v === undefined) ? "-" : (isPct ? v + "%" : v);
+
+            [...database[name]].sort((a,b) => monthOrder[a.Month] - monthOrder[b.Month]).forEach(row => {
+                const tr = document.createElement('tr');
+                const hasUndo = undoStack[`${name}_${row.Month}`];
+                tr.innerHTML = `
+                    <td>${row.Month}</td>
+                    <td>${display(row["Quality(%)"], true)}</td>
+                    <td>${display(row["Days below benchmark(98%)"])}</td>
+                    <td>${display(row["Extra Processed counts"])}</td>
+                    <td>${display(row["Leaves"])}</td>
+                    <td>${display(row["Pending(whole month)"])}</td>
+                    <td>${display(row["Number of days reached minimum count at 6pm"])}</td>
+                    <td>${display(row["Avg 6pm count"])}</td>
+                    <td title="${row["Remarks"] || ''}">${display(row["Remarks"])}</td>
+                    <td title="${row["Take away points"] || ''}">${display(row["Take away points"])}</td>
+                    <td>
+                        <div class="btn-container">
+                            <button class="btn-edit" onclick="openEdit('${name}','${row.Month}')"><i data-lucide="pencil" style="width:10px"></i> Edit</button>
+                            ${hasUndo ? 
+                                `<button class="btn-undo-action" onclick="undoClear('${name}','${row.Month}')"><i data-lucide="refresh-cw" style="width:10px"></i></button>` :
+                                `<button class="btn-clear" onclick="askClear('${name}','${row.Month}')"><i data-lucide="eraser" style="width:10px"></i></button>`
+                            }
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        async function sync() {
+            try {
+                const response = await fetch('/save', { 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body: JSON.stringify(database)
+                });
+                return response.ok;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        function openEdit(name, month) {
+            const r = database[name].find(x => x.Month === month);
+            document.getElementById('editMonth').value = month;
+            document.getElementById('editTitle').textContent = `Edit ${month}`;
+            document.getElementById('f1').value = r["Quality(%)"] || "";
+            document.getElementById('f_below').value = r["Days below benchmark(98%)"] || "";
+            document.getElementById('f2').value = r["Extra Processed counts"] || "";
+            document.getElementById('f3').value = r["Leaves"] || "";
+            document.getElementById('f4').value = r["Pending(whole month)"] || "";
+            document.getElementById('f5').value = r["Number of days reached minimum count at 6pm"] || "";
+            document.getElementById('f6').value = r["Avg 6pm count"] || "";
+            document.getElementById('f7').value = r["Remarks"] || "";
+            document.getElementById('f8').value = r["Take away points"] || "";
+            document.getElementById('editModal').style.display = 'flex';
+        }
+
+        document.getElementById('editForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('employeeSelect').value;
+            const month = document.getElementById('editMonth').value;
+            const idx = database[name].findIndex(x => x.Month === month);
+            const originalRow = JSON.parse(JSON.stringify(database[name][idx]));
+
+            const getVal = (id, type) => {
+                const v = document.getElementById(id).value;
+                return v === "" ? "" : (type === 'float' ? parseFloat(v) : parseInt(v));
+            };
+
+            database[name][idx] = {
+                "Month": month,
+                "Quality(%)": getVal('f1', 'float'),
+                "Days below benchmark(98%)": getVal('f_below', 'int'),
+                "Extra Processed counts": getVal('f2', 'int'),
+                "Leaves": getVal('f3', 'int'),
+                "Pending(whole month)": getVal('f4', 'int'),
+                "Number of days reached minimum count at 6pm": getVal('f5', 'int'),
+                "Avg 6pm count": getVal('f6', 'float'),
+                "Remarks": document.getElementById('f7').value,
+                "Take away points": document.getElementById('f8').value
+            };
+
+            if (await sync()) {
+                loadEmployeeTable();
+                closeModal('editModal');
+            } else {
+                database[name][idx] = originalRow;
+            }
+        };
+
+        function askClear(name, month) {
+            document.getElementById('targetName').textContent = `${name} - ${month}`;
+            document.getElementById('confirmModal').style.display = 'flex';
+            document.getElementById('executeClear').onclick = async () => {
+                const idx = database[name].findIndex(r => r.Month === month);
+                const originalData = JSON.parse(JSON.stringify(database[name][idx]));
+                database[name][idx] = { "Month": month, "Quality(%)": "", "Days below benchmark(98%)": "", "Extra Processed counts": "", "Leaves": "", "Pending(whole month)": "", "Number of days reached minimum count at 6pm": "", "Avg 6pm count": "", "Remarks": "", "Take away points": "" };
+                if(await sync()) {
+                    undoStack[`${name}_${month}`] = originalData;
+                    loadEmployeeTable();
+                }
+                closeModal('confirmModal');
+            };
+        }
+
+        function askClearAll() {
+            const name = document.getElementById('employeeSelect').value;
+            if (!name) return alert("Select an employee first.");
+            document.getElementById('confirmAllModal').style.display = 'flex';
+            document.getElementById('executeClearAll').onclick = async () => {
+                const originalData = JSON.parse(JSON.stringify(database[name]));
+                database[name] = database[name].map(row => ({ "Month": row.Month, "Quality(%)": "", "Days below benchmark(98%)": "", "Extra Processed counts": "", "Leaves": "", "Pending(whole month)": "", "Number of days reached minimum count at 6pm": "", "Avg 6pm count": "", "Remarks": "", "Take away points": "" }));
+                if(!await sync()) database[name] = originalData;
+                closeModal('confirmAllModal');
+                loadEmployeeTable();
+            };
+        }
+
+        init();
+
+
+// ... existing code ...
+
+        if (metric === 'all') {
+            chartType = 'radar';
+            labels = Object.keys(metricsMeta);
+            let dataValues = [], realValues = [];
+            labels.forEach(m => {
+                let activeValues = [];
+                Object.keys(fullData).forEach(empName => {
+                    const empArr = fullData[empName];
+                    if (emp === 'all' || emp === empName) {
+                        const entries = period === 'whole_year' ? empArr : [empArr.find(d => d.Month.trim() === period)].filter(Boolean);
+                        entries.forEach(entry => {
+                            // CHANGED: Fallback to 0 if value is null/undefined
+                            const v = parseFloat(getValueFromData(entry, m)) || 0;
+                            activeValues.push(v); 
+                        });
+                    }
+                });
+                // Ensure at least one value exists to avoid NaN, treating no data as 0
+                const avg = activeValues.length > 0 ? (activeValues.reduce((a,b)=>a+b, 0) / activeValues.length).toFixed(1) : 0;
+                dataValues.push(normalizeValue(m, avg));
+                realValues.push(avg);
+            });
+            // ... rest of radar config
+        } 
+        else if (emp === 'all' && period !== 'whole_year') {
+            chartType = 'bar';
+            labels = Object.keys(fullData);
+            // CHANGED: Added fallback to 0 for bar charts
+            const values = labels.map(name => {
+                const entry = fullData[name].find(x => x.Month.trim() === period);
+                return parseFloat(getValueFromData(entry, metric)) || 0;
+            });
+            // ... rest of bar config
+        }
+        else {
+            chartType = 'line';
+            labels = allMonths;
+            if (emp === 'all') {
+                datasets = Object.keys(fullData).map((name, idx) => {
+                    const color = empPalette[idx % empPalette.length];
+                    const position = idx % 2 === 0 ? 'top' : 'bottom';
+                    return {
+                        label: name,
+                        data: allMonths.map(m => {
+                            const v = getValueFromData(fullData[name].find(x => x.Month.trim() === m), metric);
+                            // CHANGED: Explicitly return 0 instead of null to keep line continuous
+                            return (v === null || v === undefined) ? 0 : parseFloat(v);
+                        }),
+                        // ... rest of dataset config
+                    };
+                });
+            } else {
+                const mColor = metricsMeta[metric]?.color || '#3b82f6';
+                datasets = [{
+                    label: metric,
+                    data: allMonths.map(m => {
+                        const v = getValueFromData(fullData[emp].find(x => x.Month.trim() === m), metric);
+                        // CHANGED: Explicitly return 0 instead of null
+                        return (v === null || v === undefined) ? 0 : parseFloat(v);
+                    }),
+                    // ... rest of dataset config
+                }];
+            }
+            // ...
+        }
+
+// ... existing code ...
+    </script>
+</body>
+</html>

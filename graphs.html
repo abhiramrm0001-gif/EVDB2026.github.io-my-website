@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Analytics - Performance Trends</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <style>
+        :root {
+            --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
+            --text-muted: #94a3b8; --primary-blue: #3b82f6; --border-color: #475569;
+            --accent: #a78bfa; --font-family: 'Sora', sans-serif;
+            --success: #10b981; --danger: #ef4444;
+        }
+        body { font-family: var(--font-family); background-color: var(--bg-color); color: var(--text-main); margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        header { padding: 1rem 2rem; background: #1e293b; border-bottom: 2px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        
+        .skeleton-overlay, .error-overlay {
+            position: absolute; inset: 0; background: var(--card-bg); 
+            z-index: 50; display: flex; flex-direction: column; gap: 20px; padding: 20px;
+        }
+        .error-overlay { display: none; justify-content: center; align-items: center; text-align: center; }
+        .skeleton-box { 
+            background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+            background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 12px;
+        }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        .controls-wrapper { display: flex; align-items: center; gap: 15px; }
+        .controls { display: flex; gap: 15px; align-items: center; background: #334155; padding: 8px 15px; border-radius: 12px; }
+        .control-group { display: flex; flex-direction: column; gap: 4px; }
+        .control-group label { font-size: 0.65rem; color: #cbd5e1; font-weight: 700; text-transform: uppercase; }
+        select { background: #0f172a; color: #ffffff; border: 2px solid var(--primary-blue); padding: 5px 10px; border-radius: 8px; font-weight: 600; outline: none; font-size: 0.85rem; }
+        
+        .btn-sync { background: var(--success); color: white; border: none; padding: 10px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; transition: transform 0.2s; }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .main-stage { flex: 1; padding: 1rem; display: flex; flex-direction: column; gap: 15px; min-height: 0; position: relative; }
+        .chart-container-box { flex: 1; background: #1e293b; border-radius: 20px; padding: 1.5rem; border: 1px solid var(--border-color); display: flex; flex-direction: column; min-height: 0; position: relative;}
+        
+        #graphHeading { text-align: center; font-weight: 700; font-size: 1.1rem; margin-bottom: 10px; color: var(--primary-blue); }
+        #avgBadgeOverlay { 
+            position: absolute; top: 20px; right: 20px; background: rgba(59, 130, 246, 0.9); 
+            padding: 8px 15px; border-radius: 10px; border: 1px solid var(--primary-blue);
+            display: none; flex-direction: column; align-items: center; z-index: 10;
+        }
+        .avg-title { font-size: 0.6rem; text-transform: uppercase; opacity: 0.8; font-weight: 700; }
+        .avg-num { font-size: 1.2rem; font-weight: 800; }
+
+        .metric-display-container { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; animation: fadeIn 0.5s ease; }
+        .metric-value { font-size: 6rem; font-weight: 800; color: var(--text-main); margin: 0; line-height: 1; }
+        .metric-unit { font-size: 1.2rem; color: var(--text-muted); margin-top: 10px; }
+        .metric-badge { margin-top: 20px; padding: 8px 20px; border-radius: 100px; font-weight: 700; font-size: 0.9rem; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .info-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; height: 120px; }
+        .info-card { background: #334155; border-radius: 16px; padding: 12px 20px; border-top: 5px solid var(--primary-blue); overflow-y: auto; }
+        .info-label { font-size: 0.7rem; color: #93c5fd; text-transform: uppercase; font-weight: 800; margin-bottom: 5px; display: flex; align-items: center; gap: 8px; }
+        .info-text { font-size: 0.85rem; line-height: 1.4; color: #ffffff; }
+        .btn-back { color: #ffffff; text-decoration: none; display: flex; align-items: center; gap: 8px; font-weight: 700; background: var(--primary-blue); padding: 8px 16px; border-radius: 10px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="index.html" class="btn-back"><i data-lucide="arrow-left"></i> Dashboard</a>
+        <div class="controls-wrapper">
+            <div class="controls">
+                <div class="control-group"><label>Employee</label><select id="empSelect"></select></div>
+                <div class="control-group"><label>Metric</label>
+                    <select id="metricSelect">
+                        <option value="all">Compare All Trends</option>
+                        <option value="Quality(%)">Quality (%)</option>
+                        <option value="Extra Processed counts">Extra Processed Counts</option>
+                        <option value="Leaves">Leaves</option>
+                        <option value="Pending(whole month)">Pending Count</option>
+                        <option value="Number of days reached minimum count at 6pm">6PM Target Days</option>
+                        <option value="Avg 6PM count">Avg 6PM Count</option>
+                        <option value="Days below benchmark(98%)">Days Below 98%</option>
+                    </select>
+                </div>
+                <div class="control-group"><label>Select Period</label><select id="monthSelect"></select></div>
+            </div>
+            <button id="syncBtn" class="btn-sync" title="Sync Data"><i data-lucide="refresh-cw" id="syncIcon"></i></button>
+        </div>
+    </header>
+
+    <main class="main-stage">
+        <div id="loadingSkeleton" class="skeleton-overlay">
+            <div class="skeleton-box" style="height: 40px; width: 30%; align-self: center;"></div>
+            <div class="skeleton-box" style="flex: 1; width: 100%;"></div>
+            <div style="display: flex; gap: 15px; height: 100px;">
+                <div class="skeleton-box" style="flex: 1;"></div>
+                <div class="skeleton-box" style="flex: 1;"></div>
+            </div>
+        </div>
+
+        <div id="errorDisplay" class="error-overlay">
+            <i data-lucide="alert-circle" style="width:48px; height:48px; color:var(--danger)"></i>
+            <h3>Unable to load analytics</h3>
+            <p style="color:var(--text-muted)">Check if data.json is present and correctly formatted.</p>
+            <button onclick="location.reload()" class="btn-sync" style="background:var(--primary-blue)">Retry</button>
+        </div>
+
+        <div class="chart-container-box">
+            <div id="avgBadgeOverlay">
+                <span class="avg-title">Team Avg (Excl. 0)</span>
+                <span class="avg-num" id="avgNumVal">--</span>
+            </div>
+            <div id="graphHeading">Performance Analysis</div>
+            <div id="chartWrapper" style="flex:1; position: relative; min-height: 0;">
+                <canvas id="mainChart"></canvas>
+            </div>
+            <div id="metricDisplay" class="metric-display-container">
+                <div class="metric-value" id="valBig">--</div>
+                <div class="metric-unit" id="valLabel">Metric Value</div>
+                <div id="valBadge" class="metric-badge">--</div>
+            </div>
+        </div>
+        <div class="info-panel">
+            <div class="info-card">
+                <div class="info-label"><i data-lucide="message-square"></i> Managerial Remarks <span id="remarksMonth"></span></div>
+                <div id="remarksDisplay" class="info-text">--</div>
+            </div>
+            <div class="info-card" style="border-top-color: var(--accent);">
+                <div class="info-label"><i data-lucide="zap"></i> Key Takeaway <span id="takeawayMonth"></span></div>
+                <div id="takeawayDisplay" class="info-text">--</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    lucide.createIcons();
+    Chart.register(ChartDataLabels);
+    let fullData = {};
+    let chartInstance = null;
+    const skeleton = document.getElementById('loadingSkeleton');
+    const errorOverlay = document.getElementById('errorDisplay');
+
+    const metricsMeta = {
+        "Quality(%)": { color: '#60a5fa' }, 
+        "Extra Processed counts": { color: '#34d399' },
+        "Leaves": { color: '#f87171' }, 
+        "Pending(whole month)": { color: '#fbbf24' },
+        "Number of days reached minimum count at 6pm": { color: '#c084fc' },
+        "Avg 6PM count": { color: '#2dd4bf' }, 
+        "Days below benchmark(98%)": { color: '#f472b6' }
+    };
+    const empPalette = ['#3b82f6', '#a78bfa', '#34d399', '#f87171', '#fbbf24', '#2dd4bf', '#f472b6', '#818cf8'];
+
+    function getValueFromData(obj, key) {
+        if (!obj) return 0; // Treated empty data as 0
+        const lowerKey = key.toLowerCase().trim();
+        const foundKey = Object.keys(obj).find(k => k.toLowerCase().trim().includes(lowerKey));
+        const val = foundKey ? obj[foundKey] : 0;
+        return (val === null || val === undefined || val === "") ? 0 : val;
+    }
+
+    async function fetchData() {
+        skeleton.style.display = 'flex';
+        errorOverlay.style.display = 'none';
+        const syncIcon = document.getElementById('syncIcon');
+        if(syncIcon) syncIcon.classList.add('spin');
+        try {
+            const response = await fetch('data.json?t=' + Date.now());
+            if(!response.ok) throw new Error("File not found");
+            fullData = await response.json();
+            const empDropdown = document.getElementById('empSelect');
+            const monthDropdown = document.getElementById('monthSelect');
+            const names = Object.keys(fullData);
+            empDropdown.innerHTML = `<option value="all">Full Team</option>` + names.map(n => `<option value="${n}">${n}</option>`).join('');
+            const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            monthDropdown.innerHTML = `<option value="whole_year">Whole Year</option>` + months.map(m => `<option value="${m}">${m}</option>`).join('');
+            updateAnalytics();
+        } catch (e) { 
+            console.error("Error loading JSON:", e);
+            errorOverlay.style.display = 'flex';
+        } 
+        finally { 
+            setTimeout(() => {
+                skeleton.style.display = 'none';
+                if(syncIcon) syncIcon.classList.remove('spin');
+            }, 600);
+        }
+    }
+
+    function normalizeValue(key, val) {
+        const rawVal = Math.max(0, parseFloat(val) || 0);
+        const k = key.toLowerCase();
+        if (k.includes("quality")) return Math.min(rawVal, 100);
+        if (k.includes("avg 6pm")) return Math.min((rawVal / 70) * 100, 100);
+        if (k.includes("extra")) return rawVal >= 20 ? 100 : (rawVal / 20) * 100;
+        if (k.includes("leaves")) return rawVal === 0 ? 100 : Math.max(100 - (rawVal * 25), 0);
+        if (k.includes("pending")) return rawVal === 0 ? 100 : Math.max(100 - (rawVal * 10), 0);
+        if (k.includes("6pm target") || k.includes("reached minimum")) return rawVal >= 10 ? 100 : (rawVal / 10) * 100;
+        if (k.includes("below") || k.includes("98%")) return rawVal === 0 ? 100 : Math.max(100 - (rawVal * 20), 0);
+        return rawVal;
+    }
+
+    function updateAnalytics() {
+        const emp = document.getElementById('empSelect').value;
+        const metric = document.getElementById('metricSelect').value;
+        const period = document.getElementById('monthSelect').value;
+        const chartWrapper = document.getElementById('chartWrapper');
+        const metricDisplay = document.getElementById('metricDisplay');
+        const avgBadge = document.getElementById('avgBadgeOverlay');
+        const ctx = document.getElementById('mainChart').getContext('2d');
+
+        chartWrapper.style.display = 'block';
+        metricDisplay.style.display = 'none';
+        avgBadge.style.display = 'none';
+
+        if (emp !== 'all' && metric !== 'all' && period !== 'whole_year') {
+            chartWrapper.style.display = 'none';
+            metricDisplay.style.display = 'flex';
+            const empData = fullData[emp] || [];
+            const mObj = empData.find(d => d.Month.trim() === period);
+            const val = getValueFromData(mObj, metric);
+            document.getElementById('valBig').innerText = val;
+            document.getElementById('valLabel').innerText = `${metric} - ${period}`;
+            const vBadge = document.getElementById('valBadge');
+            vBadge.innerText = "Monthly Metric";
+            vBadge.style.background = metricsMeta[metric]?.color || 'var(--primary-blue)';
+            return;
+        }
+
+        let datasets = [], labels = [], chartType = 'line', chartOptions = {};
+        const allMonths = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const isQuality = metric === "Quality(%)";
+
+        if (metric === 'all') {
+            chartType = 'radar';
+            labels = Object.keys(metricsMeta);
+            let dataValues = [], realValues = [];
+            labels.forEach(m => {
+                let activeValues = [];
+                Object.keys(fullData).forEach(empName => {
+                    const empArr = fullData[empName];
+                    if (emp === 'all' || emp === empName) {
+                        const entries = period === 'whole_year' ? empArr : [empArr.find(d => d.Month.trim() === period)].filter(Boolean);
+                        entries.forEach(entry => {
+                            const v = parseFloat(getValueFromData(entry, m)) || 0;
+                            activeValues.push(v);
+                        });
+                    }
+                });
+                const avg = activeValues.length > 0 ? (activeValues.reduce((a,b)=>a+b, 0) / activeValues.length).toFixed(1) : 0;
+                dataValues.push(normalizeValue(m, avg));
+                realValues.push(avg);
+            });
+            datasets = [{
+                label: emp === 'all' ? 'Team Average' : emp,
+                data: dataValues, realValues: realValues,
+                backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#3b82f6',
+                datalabels: { display: true, backgroundColor: '#000', color: '#fff', borderRadius: 3, formatter: (v, c) => c.dataset.realValues[c.dataIndex] }
+            }];
+            chartOptions = { scales: { r: { min: 0, max: 100, ticks: { display: false }, pointLabels: { color: '#fff' } } } };
+        } 
+        else if (emp === 'all' && period !== 'whole_year') {
+            chartType = 'bar';
+            labels = Object.keys(fullData);
+            const values = labels.map(name => parseFloat(getValueFromData(fullData[name].find(x => x.Month.trim() === period), metric)));
+            datasets = [{
+                label: `${metric} (${period})`, data: values,
+                backgroundColor: labels.map((_, i) => empPalette[i % empPalette.length]),
+                datalabels: { display: true, color: '#fff', anchor: 'end', align: 'top' }
+            }];
+            chartOptions = { 
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        min: isQuality ? 90 : 0, 
+                        max: isQuality ? 102 : undefined, 
+                        ticks: { color: '#fff' } 
+                    }, 
+                    x: { ticks: { color: '#fff' } } 
+                } 
+            };
+        }
+        else {
+            chartType = 'line';
+            labels = allMonths;
+            if (emp === 'all') {
+                datasets = Object.keys(fullData).map((name, idx) => {
+                    const color = empPalette[idx % empPalette.length];
+                    return {
+                        label: name,
+                        data: allMonths.map(m => parseFloat(getValueFromData(fullData[name].find(x => x.Month.trim() === m), metric))),
+                        borderColor: color, backgroundColor: color + '22', tension: 0.3, spanGaps: true,
+                        datalabels: { 
+                            display: true, color: '#fff', backgroundColor: color, borderRadius: 3, 
+                            font: { size: 9, weight: 'bold' }, padding: 2, align: idx % 2 === 0 ? 'top' : 'bottom', offset: 6
+                        }
+                    };
+                });
+            } else {
+                const mColor = metricsMeta[metric]?.color || '#3b82f6';
+                datasets = [{
+                    label: metric,
+                    data: allMonths.map(m => parseFloat(getValueFromData(fullData[emp].find(x => x.Month.trim() === m), metric))),
+                    borderColor: mColor, backgroundColor: mColor + '33', fill: true, tension: 0.3, spanGaps: true,
+                    datalabels: { display: true, color: '#fff', backgroundColor: mColor, borderRadius: 4, align: 'top', offset: 8 }
+                }];
+            }
+            chartOptions = { 
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        min: isQuality ? 90 : 0, 
+                        max: isQuality ? 102 : undefined, 
+                        ticks: { color: '#fff' } 
+                    },
+                    x: { ticks: { color: '#fff' } } 
+                } 
+            };
+        }
+
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: chartType,
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                ...chartOptions,
+                plugins: { 
+                    legend: { labels: { color: '#fff' } },
+                    datalabels: { 
+                        display: true,
+                        clip: false, 
+                        clamp: true  
+                    }
+                }
+            }
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', fetchData);
+    document.getElementById('syncBtn').addEventListener('click', fetchData);
+    document.getElementById('empSelect').addEventListener('change', updateAnalytics);
+    document.getElementById('monthSelect').addEventListener('change', updateAnalytics);
+    document.getElementById('metricSelect').addEventListener('change', updateAnalytics);
+    </script>
+</body>
+</html>

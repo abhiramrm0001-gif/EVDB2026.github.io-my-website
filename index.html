@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Performance Dashboard - Elite Pro</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@100..800&display=swap" rel="stylesheet">
+
+    <script src="https://unpkg.com/lucide@0.470.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #f8fafc; --card-bg: #ffffff; --text-main: #0f172a;
+            --text-muted: #64748b; --primary-blue: #2563eb; --border-color: #e2e8f0;
+            --success: #10b981; --danger: #ef4444; --purple: #8b5cf6;
+            --orange: #f59e0b; --indigo: #6366f1; --font-family: 'Sora', sans-serif;
+            --cyan: #06b6d4; --emerald: #10b981; --nav-bg: #ffffff;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f1f5f9;
+            --text-muted: #94a3b8; --border-color: #334155; --nav-bg: #1e293b;
+        }
+
+        body { font-family: var(--font-family); background-color: var(--bg-color); color: var(--text-main); margin: 0; padding-bottom: 50px; overflow-x: hidden; transition: background-color 0.3s ease; }
+        .container { max-width: 1280px; margin: 0 auto; padding: 0 15px; width: 100%; box-sizing: border-box; }
+        
+        .navbar { background: var(--nav-bg); border-bottom: 1px solid var(--border-color); padding: 0.8rem 0; position: sticky; top: 0; z-index: 100; transition: background-color 0.3s ease; }
+        .nav-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+        
+        .logo { font-weight: 800; color: var(--primary-blue); font-size: 0.9rem; letter-spacing: 0.05em; text-transform: uppercase; }
+
+        .page-header { margin: 20px 0; }
+        .header-title h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 800; letter-spacing: -0.04em; }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; }
+        
+        .card { 
+            background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; 
+            padding: 1.2rem; display: flex; flex-direction: column; position: relative; 
+            min-height: 200px; width: 100%; box-sizing: border-box; overflow: hidden; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 12px 24px -10px rgba(0,0,0,0.2); border-color: var(--primary-blue); }
+        
+        .span-2 { grid-column: span 2; }
+        @media (max-width: 1024px) { .span-2 { grid-column: span 1; } }
+
+        .accent-bar { position: absolute; top: -1px; left: -1px; right: -1px; height: 6px; border-top-left-radius: 20px; border-top-right-radius: 20px; z-index: 10; }
+
+        .centered-box-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; height: 100%; gap: 15px; }
+        .card-title { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; font-weight: 700; letter-spacing: 0.1em; display: flex; align-items: center; gap: 6px; }
+        .month-indicator { color: var(--text-muted); font-size: 0.6rem; margin-left: auto; font-weight: 400; }
+
+        .employee-dropdown {
+            padding: 10px 16px; border-radius: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-color); background: var(--card-bg); font-size: 0.85rem;
+            display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease; color: var(--text-main);
+            width: 100%; max-width: 250px; outline: none; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+        }
+
+        .btn { padding: 8.5px 16px; border-radius: 12px; font-weight: 600; cursor: pointer; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease; text-decoration: none; border: none; color: white; }
+        .btn:hover { transform: translateY(-2px); filter: brightness(110%); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        
+        .btn-sync { background: var(--emerald); }
+        .btn-theme { background: var(--border-color); color: var(--text-main); }
+        .btn-excel { background: #10b981; }
+        
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none !important; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
+
+        .card-value { font-size: 2.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 2px; }
+        
+        canvas { display: block; width: 100% !important; height: 100% !important; }
+        .chart-container-squash { position: relative; width: 100%; height: 120px; margin-top: 5px; flex-grow: 1; }
+        
+        .gauge-wrapper { position: relative; width: 160px; height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .gauge-label { position: absolute; bottom: 0; font-size: 0.6rem; font-weight: 700; color: var(--text-main); width: 100%; display: flex; justify-content: space-between; padding: 2px 10px; z-index: 5; box-sizing: border-box; }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-card { background: var(--card-bg); padding: 30px; border-radius: 20px; width: 350px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); border: 1px solid var(--border-color); }
+        .modal-label { font-size: 0.7rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; display: block; margin-bottom: 5px; }
+        .modal-select { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main); font-family: inherit; font-weight: 600; }
+        
+        #loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 3px; background: transparent; z-index: 1000; }
+        #loader div { height: 100%; background: var(--primary-blue); width: 0; transition: width 0.3s ease; }
+    </style>
+</head>
+<body data-theme="light">
+    <div id="loader"><div></div></div>
+
+    <header class="navbar">
+        <div class="container nav-content">
+            <div class="logo">EV PERFORMANCE ANALYTICS</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <button class="btn btn-theme" onclick="toggleTheme()" id="themeBtn" aria-label="Toggle Dark Mode"><i data-lucide="moon"></i></button>
+                <button class="btn btn-sync" id="syncBtn" onclick="syncLocalData()" aria-label="Sync Data"><i data-lucide="refresh-cw"></i> Sync</button>
+                <a href="Employee.html" class="btn" style="background: var(--cyan);" aria-label="Employee List"><i data-lucide="users"></i> Employee</a>
+                <a href="graphs.html" class="btn" style="background: var(--orange);" aria-label="View Analytics"><i data-lucide="bar-chart-3"></i> Analytics</a>
+                <a href="editor.html" class="btn" style="background: #04c76c;" aria-label="Add Data"><i data-lucide="edit-3"></i> ADD Data</a>
+                <a href="manage.html" class="btn" style="background: #e64ce0;" aria-label="Management Settings"><i data-lucide="settings"></i> Manage</a>
+                <button class="btn" style="background: var(--purple);" onclick="viewAllData()" aria-label="View Database"><i data-lucide="table"></i> Database</button>
+                <button class="btn btn-excel" onclick="openExportModal()" aria-label="Export to Excel"><i data-lucide="download"></i> Export</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="page-header">
+            <div class="header-title"><h1>2025 Performance <span style="color: var(--primary-blue);">Dashboard</span></h1></div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card span-2">
+                <div class="accent-bar" style="background: var(--primary-blue);"></div>
+                <div class="centered-box-content">
+                    <div style="flex: 1; min-width: 220px;">
+                        <div class="card-title"><i data-lucide="user"></i> Employee Selection</div>
+                        <select id="employeeSelect" class="employee-dropdown" aria-label="Select Employee"><option value="">Loading...</option></select>
+                        <div style="margin-top: 25px;">
+                            <div class="card-title"><i data-lucide="calendar"></i> Reporting Month</div>
+                            <select class="employee-dropdown" id="monthSelect" aria-label="Select Month"></select>
+                        </div>
+                    </div>
+                    
+                    <div style="flex: 1.2; min-width: 280px;">
+                        <div class="card-title"><i data-lucide="line-chart"></i> Quality (%) <span id="qualityMonthInd" class="month-indicator"></span></div>
+                        <div class="chart-container-squash">
+                            <canvas id="chartYearlyQuality"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="gauge-wrapper">
+                        <canvas id="gaugeAccuracy"></canvas>
+                        <div id="qualityValue" style="font-weight: 800; font-size: 1.3rem; position: absolute; bottom: 20px;">--%</div>
+                        <div class="gauge-label"><span style="background: #0FB881; border: 0.5px solid black; padding: 0.5px 1px; border-radius: 0.5px;">90%</span> <span style="background: #0FB881; border: 0.5px solid black; padding: 0.5px 1px; border-radius: 3px;">100%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="accent-bar" style="background: var(--primary-blue);"></div>
+                <div class="card-title" style="color: var(--primary-blue);"><i data-lucide="layers"></i> Extra Processed <span id="extraMonth" class="month-indicator"></span></div>
+                <div class="card-value" id="extraCounts">--</div>
+                <div class="chart-container-squash"><canvas id="chartExtra"></canvas></div>
+            </div>
+
+            <div class="card">
+                <div class="accent-bar" style="background: var(--danger);"></div>
+                <div class="card-title" style="color: var(--danger);"><i data-lucide="calendar-off"></i> Monthly Leaves <span id="leaveMonth" class="month-indicator"></span></div>
+                <div class="card-value" id="leaveCount" style="color: var(--danger);">--</div>
+                <div class="chart-container-squash"><canvas id="chartLeavesTrend"></canvas></div>
+            </div>
+
+            <div class="card">
+                <div class="accent-bar" style="background: var(--orange);"></div>
+                <div class="card-title" style="color: var(--orange);"><i data-lucide="clock"></i> Pending counts <span id="pendingMonth" class="month-indicator"></span></div>
+                <div class="card-value" id="pendingCount">--</div>
+                <div class="chart-container-squash"><canvas id="chartPending"></canvas></div>
+            </div>
+
+            <div class="card">
+                <div class="accent-bar" style="background: var(--purple);"></div>
+                <div class="card-title" style="color: var(--purple);"><i data-lucide="zap"></i> 6 PM Target Success <span id="targetMonth" class="month-indicator"></span></div>
+                <div class="card-value" id="minCountDays">--</div>
+                <div class="chart-container-squash"><canvas id="chartMinCount"></canvas></div>
+            </div>
+
+            <div class="card span-2" style="border-left: 5px solid var(--primary-blue); min-height: 120px;">
+                <div class="card-title" style="color: var(--primary-blue);"><i data-lucide="message-square"></i> Managerial Remarks</div>
+                <p id="remarksText" style="margin: 0; font-size: 0.9rem; font-weight: 500; color: var(--text-muted); line-height: 1.5;">Select data to view...</p>
+            </div>
+
+            <div class="card" style="border-left: 5px solid var(--indigo); min-height: 120px;">
+                <div class="card-title" style="color: var(--indigo);"><i data-lucide="lightbulb"></i> Strategic Takeaway</div>
+                <div id="takeAwayText" style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-top: 8px;">--</div>
+            </div>
+        </div>
+    </main>
+
+    <div id="exportModal" class="modal-overlay" role="dialog" aria-labelledby="modalTitle">
+        <div class="modal-card">
+            <h3 id="modalTitle" style="margin-top: 0; font-weight: 800;">Export to Excel</h3>
+            <label class="modal-label" for="exportEmp">Employee</label>
+            <select id="exportEmp" class="modal-select"></select>
+            <label class="modal-label" for="exportMonth">Month</label>
+            <select id="exportMonth" class="modal-select"><option value="ALL">Full Year</option></select>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button onclick="closeExportModal()" style="padding: 10px 15px; border-radius: 8px; border: none; cursor: pointer; background: var(--bg-color); color: var(--text-main);">Cancel</button>
+                <button onclick="processExport()" style="padding: 10px 15px; border-radius: 8px; border: none; background: #166534; color: white; cursor: pointer;">Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        Chart.register(ChartDataLabels);
+        Chart.defaults.font.family = "'Sora', sans-serif";
+
+        let fullData = {}, currentEmployee = "Full Team", charts = {};
+        const monthsList = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        
+        (() => {
+            const mSelect = document.getElementById('monthSelect');
+            const eMonth = document.getElementById('exportMonth');
+            monthsList.forEach(m => {
+                mSelect.add(new Option(m, m));
+                eMonth.add(new Option(m, m));
+            });
+            mSelect.value = monthsList[new Date().getMonth()];
+        })();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            syncLocalData(true);
+        });
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
+        }
+
+        function toggleTheme() {
+            const current = document.body.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            document.body.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateThemeIcon(next);
+            refreshDashboard();
+        }
+
+        function updateThemeIcon(theme) {
+            const btn = document.getElementById('themeBtn');
+            btn.innerHTML = theme === 'light' ? '<i data-lucide="moon"></i>' : '<i data-lucide="sun"></i>';
+            lucide.createIcons();
+        }
+
+        function viewAllData() { window.open('viewer.html', '_blank'); }
+
+        const getSafeFloat = (val) => {
+            if (val === null || val === undefined || val === "") return 0;
+            const cleaned = String(val).replace(/[^-0-9.]/g, '');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : parsed;
+        };
+
+        async function syncLocalData(silent = false) {
+            const btn = document.getElementById('syncBtn');
+            const loader = document.getElementById('loader');
+            const originalHTML = btn.innerHTML;
+
+            try {
+                if (!silent) {
+                    btn.disabled = true;
+                    btn.innerHTML = '<i data-lucide="refresh-cw" class="spin"></i> Syncing...';
+                    loader.style.display = 'block';
+                    loader.firstElementChild.style.width = '50%';
+                    lucide.createIcons();
+                }
+
+                const response = await fetch(`data.json?t=${new Date().getTime()}`);
+                if (!response.ok) throw new Error("Fetch failed");
+                const rawData = await response.json();
+                
+                const teamData = monthsList.map(month => {
+                    let totalQuality = 0, totalExtra = 0, totalLeaves = 0, totalPending = 0, totalMinCount = 0;
+                    let qualityEntryCount = 0;
+
+                    Object.values(rawData).forEach(empRecords => {
+                        const record = empRecords.find(r => r.Month.trim().toLowerCase() === month.toLowerCase());
+                        if (record) {
+                            const qVal = getSafeFloat(record["Quality(%)"]);
+                            if (qVal > 0) {
+                                totalQuality += qVal;
+                                qualityEntryCount++;
+                            }
+                            totalExtra += getSafeFloat(record["Extra Processed counts"]);
+                            totalLeaves += getSafeFloat(record["Leaves"]);
+                            totalPending += getSafeFloat(record["Pending(whole month)"]);
+                            totalMinCount += getSafeFloat(record["Number of days reached minimum count at 6pm"]);
+                        }
+                    });
+
+                    return {
+                        "Month": month,
+                        "Quality(%)": qualityEntryCount > 0 ? (totalQuality / qualityEntryCount).toFixed(2) : "0",
+                        "Extra Processed counts": totalExtra,
+                        "Leaves": totalLeaves,
+                        "Pending(whole month)": totalPending,
+                        "Number of days reached minimum count at 6pm": totalMinCount,
+                        "Remarks": "Team aggregate view.",
+                        "Take away points": "Performance summary across all members."
+                    };
+                });
+
+                fullData = { "Full Team": teamData, ...rawData };
+                
+                const empDropdown = document.getElementById('employeeSelect');
+                const exportEmp = document.getElementById('exportEmp');
+                const savedEmp = localStorage.getItem('selectedEmployee') || "Full Team";
+
+                empDropdown.innerHTML = '';
+                exportEmp.innerHTML = '<option value="ALL">Full Team (All Members)</option>';
+                
+                Object.keys(fullData).forEach(name => {
+                    empDropdown.add(new Option(name, name));
+                    if(name !== "Full Team") exportEmp.add(new Option(name, name));
+                });
+
+                empDropdown.value = fullData[savedEmp] ? savedEmp : "Full Team";
+                currentEmployee = empDropdown.value;
+                
+                if (!silent) loader.firstElementChild.style.width = '100%';
+                refreshDashboard();
+
+                if (!silent) {
+                    btn.style.background = "#059669";
+                    btn.innerHTML = '<i data-lucide="check"></i> Updated';
+                    lucide.createIcons();
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHTML;
+                        btn.style.background = "";
+                        loader.style.display = 'none';
+                        loader.firstElementChild.style.width = '0';
+                        lucide.createIcons();
+                    }, 1500);
+                }
+            } catch (err) {
+                console.error("Sync Error:", err);
+                if (!silent) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalHTML;
+                    loader.style.display = 'none';
+                    lucide.createIcons();
+                    alert("Sync Error: Please check if data.json exists and is valid.");
+                }
+            }
+        }
+
+        function refreshDashboard() {
+            if (!fullData[currentEmployee]) return;
+            const data = fullData[currentEmployee];
+            const labels = data.map(d => d.Month.substring(0, 3));
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            const tickColor = isDark ? '#94a3b8' : '#64748b';
+
+            renderChart('chartYearlyQuality', 'bar', data.map(d => getSafeFloat(d["Quality(%)"])), '#2563eb', labels, true, false, tickColor);
+            renderChart('chartExtra', 'bar', data.map(d => getSafeFloat(d["Extra Processed counts"])), '#2563eb', labels, false, false, tickColor);
+            renderChart('chartLeavesTrend', 'line', data.map(d => getSafeFloat(d["Leaves"])), '#ef4444', labels, false, false, tickColor);
+            renderChart('chartPending', 'line', data.map(d => getSafeFloat(d["Pending(whole month)"])), '#f59e0b', labels, false, false, tickColor);
+            renderChart('chartMinCount', 'line', data.map(d => getSafeFloat(d["Number of days reached minimum count at 6pm"])), '#8b5cf6', labels, false, true, tickColor);
+            
+            updateMonthlyMetrics(document.getElementById('monthSelect').value);
+        }
+
+        function updateMonthlyMetrics(m) {
+            const d = fullData[currentEmployee]?.find(i => i.Month.trim().toLowerCase() === m.trim().toLowerCase());
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            
+            ['extraMonth', 'leaveMonth', 'pendingMonth', 'targetMonth', 'qualityMonthInd'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.textContent = `(${m})`;
+            });
+
+            if (!d) {
+                ['qualityValue','extraCounts','leaveCount','pendingCount','minCountDays','takeAwayText'].forEach(id => {
+                    document.getElementById(id).textContent = "--";
+                });
+                document.getElementById('remarksText').textContent = "No data for " + m;
+                charts['gauge']?.destroy();
+                return;
+            }
+
+            document.getElementById('qualityValue').textContent = d["Quality(%)"] + "%";
+            document.getElementById('extraCounts').textContent = d["Extra Processed counts"];
+            document.getElementById('leaveCount').textContent = d["Leaves"];
+            document.getElementById('pendingCount').textContent = d["Pending(whole month)"];
+            document.getElementById('minCountDays').textContent = d["Number of days reached minimum count at 6pm"];
+            document.getElementById('remarksText').textContent = d["Remarks"] || "No remarks.";
+            document.getElementById('takeAwayText').textContent = d["Take away points"] || "N/A";
+
+            charts['gauge']?.destroy();
+            const val = getSafeFloat(d["Quality(%)"]);
+            const score = Math.min(100, Math.max(0, (val - 90) * 10));
+            
+            charts['gauge'] = new Chart(document.getElementById('gaugeAccuracy'), {
+                type: 'doughnut',
+                data: { datasets: [{ data: [score, 100-score], backgroundColor: [val >= 98 ? '#10b981' : '#ef4444', isDark ? '#334155' : '#f1f5f9'], borderWidth: 0, borderRadius: 10 }] },
+                options: { rotation: -90, circumference: 180, cutout: '80%', plugins: { tooltip: false, datalabels: false }, maintainAspectRatio: false }
+            });
+        }
+
+        function renderChart(id, type, data, color, labels, isQuality = false, isStep = false, tickColor) {
+            if (charts[id]) charts[id].destroy(); 
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+	    const context = ctx.getContext('2d');
+  	    context.clearRect(0, 0, ctx.width, ctx.height);
+
+            const nonZeroData = data.filter(v => v > 0);
+            const yMin = (isQuality && nonZeroData.length > 0) ? Math.min(...nonZeroData) - 2 : 0;
+
+            charts[id] = new Chart(ctx, {
+                type: type,
+                data: { labels: labels, datasets: [{ data, backgroundColor: color, borderColor: color, tension: 0.4, borderCapStyle: 'round', stepped: isStep }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { top: 25, bottom: 5, left: 5, right: 5 } },
+                    plugins: { legend: false, datalabels: { anchor: 'end', align: 'top', offset: -2, font: { size: 9, weight: 'bold' }, color: tickColor, formatter: Math.round } },
+                    scales: { 
+                        x: { grid: { display: false }, ticks: { font: { size: 8 }, color: tickColor } }, 
+                        y: { display: false, min: yMin, max: isQuality ? 102 : undefined } 
+                    }
+                }
+            });
+ }
+
+        function openExportModal() { document.getElementById('exportModal').style.display = 'flex'; }
+        function closeExportModal() { document.getElementById('exportModal').style.display = 'none'; }
+        
+        function processExport() {
+            const empSelection = document.getElementById('exportEmp').value;
+            const monthSelection = document.getElementById('exportMonth').value;
+            const wb = XLSX.utils.book_new();
+            const headerStyle = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "2563EB" } }, alignment: { horizontal: "center" } };
+
+            function applyStyles(ws) {
+                if(!ws['!ref']) return;
+                const range = XLSX.utils.decode_range(ws['!ref']);
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const address = XLSX.utils.encode_col(C) + "1";
+                    if (ws[address]) ws[address].s = headerStyle;
+                }
+                ws['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 40 }, { wch: 40 }];
+            }
+
+            // Logic for "Full Team" + "Full Year" -> Create individual tabs
+            if (empSelection === "ALL" && monthSelection === "ALL") {
+                Object.keys(fullData).forEach(name => {
+                    if (name === "Full Team") return;
+                    let d = fullData[name];
+                    if (d.length > 0) {
+                        const ws = XLSX.utils.json_to_sheet(d);
+                        applyStyles(ws);
+                        // Ensure sheet name is unique and valid (max 31 chars)
+                        XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
+                    }
+                });
+            } else {
+                // Single tab for specific selections
+                let d = [];
+                if (empSelection === "ALL") {
+                    // Combine all employee records for a specific month into one sheet
+                    Object.keys(fullData).forEach(name => {
+                        if (name === "Full Team") return;
+                        const record = fullData[name].find(r => r.Month.toLowerCase() === monthSelection.toLowerCase());
+                        if (record) d.push({ Employee: name, ...record });
+                    });
+                } else {
+                    d = fullData[empSelection] || [];
+                    if (monthSelection !== "ALL") d = d.filter(r => r.Month.toLowerCase() === monthSelection.toLowerCase());
+                }
+
+                if (d.length === 0) return alert("No data.");
+                const ws = XLSX.utils.json_to_sheet(d);
+                applyStyles(ws);
+                XLSX.utils.book_append_sheet(wb, ws, empSelection === "ALL" ? monthSelection : empSelection.substring(0, 31));
+            }
+
+            XLSX.writeFile(wb, `EV_Performance_${monthSelection}.xlsx`);
+            closeExportModal();
+        }
+
+        document.getElementById('employeeSelect').onchange = function() { 
+            currentEmployee = this.value; 
+            localStorage.setItem('selectedEmployee', this.value);
+            refreshDashboard(); 
+        };
+        document.getElementById('monthSelect').onchange = function() { 
+            updateMonthlyMetrics(this.value); 
+        };
+
+        let rTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(rTimer);
+            rTimer = setTimeout(() => refreshDashboard(), 250);
+        });
+
+    </script>
+</body>
+</html>

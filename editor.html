@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Performance - Premium Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <style>
+        :root {
+            --bg-color: #f8fafc; --card-bg: #ffffff; --primary: #2563eb;
+            --text-main: #0f172a; --text-muted: #64748b; --border: #e2e8f0;
+            --success: #10b981; --danger: #ef4444; --radius: 20px;
+            --shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --nav-bg: rgba(255, 255, 255, 0.8);
+            --accent-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc;
+            --text-muted: #94a3b8; --border: #334155; --nav-bg: rgba(15, 23, 42, 0.8);
+        }
+
+        body { font-family: 'Sora', sans-serif; background-color: var(--bg-color); color: var(--text-main); margin: 0; padding-bottom: 80px; transition: 0.3s; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+        /* NAVBAR */
+        .navbar { background: var(--nav-bg); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 1rem 0; position: sticky; top: 0; z-index: 100; }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; }
+        .logo-text { font-weight: 800; font-size: 1.3rem; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        /* THEME TOGGLE */
+        .theme-toggle-btn {
+            position: relative; width: 60px; height: 30px; background: #e2e8f0; border-radius: 30px;
+            cursor: pointer; display: flex; align-items: center; padding: 4px; transition: 0.4s; border: 1px solid var(--border);
+        }
+        [data-theme="dark"] .theme-toggle-btn { background: #334155; }
+        .toggle-thumb {
+            width: 22px; height: 22px; background: white; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); color: #f59e0b;
+        }
+        [data-theme="dark"] .toggle-thumb { transform: translateX(30px); background: #0f172a; color: #818cf8; }
+
+        /* MODAL & JSON VIEWER */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 2000; align-items: center; justify-content: center; }
+        .json-modal { width: 95%; max-width: 1000px; height: 85vh; background: var(--card-bg); border-radius: 24px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border); }
+        
+        /* FIXED ROW HEADER */
+        .json-header { 
+            padding: 12px 20px; border-bottom: 1px solid var(--border); 
+            display: flex; align-items: center; justify-content: space-between; gap: 15px; 
+            background: var(--card-bg);
+        }
+        .json-header h3 { margin: 0; font-size: 1rem; white-space: nowrap; flex-shrink: 0; }
+        
+        .json-search-container { position: relative; flex-grow: 1; max-width: 400px; }
+        .json-search-container input { 
+            padding: 10px 12px; font-size: 0.85rem; border-radius: 10px; 
+            border: 1px solid var(--border); background: var(--bg-color); width: 100%; transition: 0.2s;
+        }
+        .json-search-container input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+        .json-controls { display: flex; gap: 8px; flex-shrink: 0; }
+        .json-body { flex: 1; overflow-y: auto; padding: 25px; background: #0f172a; color: #38bdf8; font-family: monospace; font-size: 0.9rem; }
+        mark { background: #fbbf24; color: #000; border-radius: 2px; }
+
+        /* BUTTONS */
+        .btn-action-base { padding: 10px 20px; border-radius: 30px; border: none; cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; transition: 0.3s; font-size: 0.85rem; }
+        .btn-confirm { background: var(--success); color: white; }
+        .btn-nav-top { background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border); }
+        .btn-nav-top:hover { background: var(--primary); color: white; border-color: var(--primary); }
+        .icon-btn { width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: white; transition: 0.2s; }
+        .icon-btn:hover { opacity: 0.8; transform: translateY(-1px); }
+
+        /* REST OF STYLE */
+        .card-wrapper { margin-top: 30px; padding: 3px; border-radius: calc(var(--radius) + 3px); background: var(--border); }
+        .card-wrapper.editing { background: var(--accent-gradient); }
+        .card { background: var(--card-bg); border-radius: var(--radius); padding: 40px; box-shadow: var(--shadow); }
+        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; position: relative; }
+        .form-group label { font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; }
+        input, select, textarea { padding: 14px 16px; border-radius: 12px; border: 2px solid var(--border); background: var(--bg-color); color: var(--text-main); font-family: inherit; font-size: 0.95rem; outline: none; width: 100%; box-sizing: border-box; }
+        input.invalid { border-color: var(--danger) !important; background: #fff1f2 !important; color: #991b1b !important; /* Dark red text for readability */ }
+        .error-msg { color: var(--danger); font-size: 0.6rem; font-weight: 700; opacity: 0; transition: 0.2s; }
+        input.invalid + .error-msg { opacity: 1; }
+        .save-bar { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(150px); background: #0f172a; padding: 15px 30px; border-radius: 50px; display: flex; align-items: center; gap: 25px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4); transition: 0.5s; z-index: 1000; }
+        .save-bar.active { transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="container nav-content">
+            <div class="logo-text">PERFORMANCE EDITOR</div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <div class="theme-toggle-btn" onclick="toggleTheme()">
+                    <div class="toggle-thumb"><i id="theme-icon" data-lucide="sun" size="14"></i></div>
+                </div>
+                <button class="btn-action-base btn-nav-top" onclick="openJsonModal()"><i data-lucide="code"></i></button>
+                <button class="btn-action-base btn-nav-top" onclick="openExportModal()"><i data-lucide="download"></i> Export</button>
+		<a href="index.html" class="btn-action-base btn-nav-top" style="text-decoration: none;"> <i data-lucide="layout-dashboard"></i> Dashboard </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="card-wrapper" id="borderEffect">
+            <div class="card">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                    <div class="form-group"><label>Employee</label><select id="employeeSelect" onchange="loadMonthData()"></select></div>
+                    <div class="form-group"><label>Month</label>
+                        <select id="monthSelect" onchange="loadMonthData()">
+                            <option>January</option><option>February</option><option>March</option><option>April</option><option>May</option><option>June</option><option>July</option><option>August</option><option>September</option><option>October</option><option>November</option><option>December</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="metrics-grid">
+                    <div class="form-group"><label>Quality (%)</label><input type="number" step="0.01" class="editable" id="quality" data-rule="0-100"><span class="error-msg">0 to 100%</span></div>
+                    <div class="form-group"><label>Extra counts</label><input type="number" class="editable" id="extra" data-rule="pos"><span class="error-msg">Min 0</span></div>
+                    <div class="form-group"><label>Leaves</label><input type="number" class="editable" id="leaves" data-rule="0-31"><span class="error-msg">0 to 31</span></div>
+                    <div class="form-group"><label>Pending Work</label><input type="number" class="editable" id="pending" data-rule="pos"><span class="error-msg">Min 0</span></div>
+                    <div class="form-group"><label>Below Benchmark</label><input type="number" class="editable" id="belowBenchmark" data-rule="pos"><span class="error-msg">Min 0</span></div>
+                    <div class="form-group"><label>6PM Target</label><input type="number" class="editable" id="target6pm" data-rule="0-31"><span class="error-msg">0 to 31</span></div>
+                    <div class="form-group"><label>Avg 6pm </label><input type="number" step="0.1" class="editable" id="avg6" data-rule="pos"><span class="error-msg">0 to 70</span></div>
+                    <div class="form-group" style="grid-column: span 2;"><label>Take Away Points</label><input type="text" class="editable" id="takeaway"></div>
+                    <div class="form-group" style="grid-column: span 3;"><label>Overall Remarks</label><textarea class="editable" id="remarks"></textarea></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="save-bar" id="saveBar">
+        <span id="saveStatusText" style="color: white; font-weight: 600; font-size: 0.85rem;">Unsaved Changes</span>
+        <button class="btn-action-base btn-confirm" id="saveBtn" onclick="saveData()"><i data-lucide="check-circle"></i> Save Changes</button>
+    </div>
+
+    <div id="jsonModal" class="modal-overlay">
+        <div class="json-modal">
+            <div class="json-header">
+                <h3>JSON VIEWER</h3>
+                <div class="json-search-container">
+                    <input type="text" id="jsonSearch" placeholder="Filter keys or values..." oninput="filterJson()">
+                </div>
+                <div class="json-controls">
+                    <button class="icon-btn" style="background:var(--primary)" onclick="scrollJson('top')" title="Scroll Top"><i data-lucide="chevrons-up"></i></button>
+                    <button class="icon-btn" style="background:var(--primary)" onclick="scrollJson('bottom')" title="Scroll Bottom"><i data-lucide="chevrons-down"></i></button>
+                    <button class="icon-btn" style="background:var(--danger)" onclick="closeJsonModal()"><i data-lucide="x"></i></button>
+                </div>
+            </div>
+            <div class="json-body" id="jsonBody"><pre id="jsonDisplay"></pre></div>
+        </div>
+    </div>
+
+    <div id="exportModal" class="modal-overlay">
+        <div class="card" style="width: 350px;">
+            <h3>Export Data</h3>
+            <div class="form-group"><label>Team Member</label><select id="exportEmp"></select></div>
+            <div class="form-group" style="margin: 15px 0;"><label>Period</label><select id="exportMonth"><option value="ALL">Full Year</option><option>January</option><option>February</option><option>March</option><option>April</option><option>May</option><option>June</option><option>July</option><option>August</option><option>September</option><option>October</option><option>November</option><option>December</option></select></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn-action-base" onclick="closeExportModal()">Cancel</button>
+                <button class="btn-action-base btn-confirm" onclick="processExport()">Download</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    lucide.createIcons();
+    let localData = {};
+    const normalize = (t) => t ? t.toString().toLowerCase().trim() : "";
+
+    function toggleTheme() {
+        const b = document.body;
+        const current = b.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        b.setAttribute('data-theme', next);
+        const icon = document.getElementById('theme-icon');
+        icon.setAttribute('data-lucide', next === 'dark' ? 'moon' : 'sun');
+        lucide.createIcons();
+    }
+
+    async function init() {
+        try {
+            const res = await fetch(`data.json?v=${Date.now()}`);
+            localData = await res.json();
+            const names = Object.keys(localData).sort();
+            const mainEmp = document.getElementById('employeeSelect');
+            const expEmp = document.getElementById('exportEmp');
+            expEmp.innerHTML = '<option value="ALL">-- Full Team --</option>';
+            names.forEach(n => {
+                mainEmp.add(new Option(n, n));
+                expEmp.add(new Option(n, n));
+            });
+            loadMonthData();
+        } catch(e) { console.error("Load failed"); }
+    }
+
+    function loadMonthData() {
+        const emp = document.getElementById('employeeSelect').value;
+        const mon = normalize(document.getElementById('monthSelect').value);
+        const fields = { quality: "Quality(%)", extra: "Extra Processed counts", leaves: "Leaves", pending: "Pending(whole month)", belowBenchmark: "Days below benchmark(98%)", target6pm: "Number of days reached minimum count at 6pm", avg6: "Avg 6pm count", takeaway: "Take away points", remarks: "Remarks" };
+        Object.keys(fields).forEach(id => { document.getElementById(id).value = ""; document.getElementById(id).classList.remove('invalid'); });
+        if (localData[emp]) {
+            const r = localData[emp].find(x => normalize(x.Month) === mon);
+            if (r) Object.entries(fields).forEach(([id, key]) => document.getElementById(id).value = r[key] ?? "");
+        }
+        document.getElementById('saveBar').classList.remove('active');
+        document.getElementById('borderEffect').classList.remove('editing');
+    }
+
+    function filterJson() {
+        const term = document.getElementById('jsonSearch').value.toLowerCase();
+        const raw = JSON.stringify(localData, null, 4);
+        if (!term) { document.getElementById('jsonDisplay').innerHTML = raw; return; }
+        const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        document.getElementById('jsonDisplay').innerHTML = raw.replace(regex, '<mark>$1</mark>');
+    }
+
+    function openJsonModal() { 
+        document.getElementById('jsonSearch').value = "";
+        document.getElementById('jsonDisplay').innerText = JSON.stringify(localData, null, 4); 
+        document.getElementById('jsonModal').style.display = 'flex'; 
+    }
+    
+    function closeJsonModal() { document.getElementById('jsonModal').style.display = 'none'; }
+    function scrollJson(dir) { const b = document.getElementById('jsonBody'); b.scrollTop = (dir === 'top') ? 0 : b.scrollHeight; }
+    function openExportModal() { document.getElementById('exportModal').style.display = 'flex'; }
+    function closeExportModal() { document.getElementById('exportModal').style.display = 'none'; }
+
+    function validateFields() {
+        let hasError = false;
+        document.querySelectorAll('.editable[data-rule]').forEach(el => {
+            const val = parseFloat(el.value) || 0;
+            const rule = el.getAttribute('data-rule');
+            let inv = false;
+            if (rule === '0-100') inv = (val < 0 || val > 100);
+            else if (rule === 'pos') inv = (val < 0);
+            else if (rule === '0-31') inv = (val < 0 || val > 31);
+            else if (rule === '0-70') inv = (val < 0 || val > 70);
+            if (inv) { el.classList.add('invalid'); hasError = true; } else el.classList.remove('invalid');
+        });
+        document.getElementById('saveBtn').disabled = hasError;
+    }
+
+    async function saveData() {
+        const emp = document.getElementById('employeeSelect').value;
+        const mon = document.getElementById('monthSelect').value;
+        const getV = (id) => document.getElementById(id).value === "" ? 0 : parseFloat(document.getElementById(id).value);
+        const entry = { "Month": mon, "Quality(%)": getV('quality'), "Extra Processed counts": getV('extra'), "Leaves": getV('leaves'), "Pending(whole month)": getV('pending'), "Days below benchmark(98%)": getV('belowBenchmark'), "Number of days reached minimum count at 6pm": getV('target6pm'), "Avg 6pm count": getV('avg6'), "Take away points": document.getElementById('takeaway').value, "Remarks": document.getElementById('remarks').value };
+        if (!localData[emp]) localData[emp] = [];
+        const idx = localData[emp].findIndex(x => normalize(x.Month) === normalize(mon));
+        if (idx > -1) localData[emp][idx] = entry; else localData[emp].push(entry);
+        await fetch('/save', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(localData)});
+        document.getElementById('saveBar').classList.remove('active');
+        document.getElementById('borderEffect').classList.remove('editing');
+    }
+
+    function processExport() {
+        const emp = document.getElementById('exportEmp').value;
+        const mon = document.getElementById('exportMonth').value;
+        const wb = XLSX.utils.book_new();
+        if (emp === "ALL" && mon === "ALL") {
+            Object.keys(localData).sort().forEach(name => {
+                const ws = XLSX.utils.json_to_sheet(localData[name]);
+                applyStyles(ws);
+                XLSX.utils.book_append_sheet(wb, ws, name.substring(0, 31));
+            });
+        } else {
+            let rows = [];
+            if (emp === "ALL") {
+                Object.keys(localData).forEach(n => {
+                    const f = localData[n].filter(r => normalize(r.Month) === normalize(mon));
+                    f.forEach(r => rows.push({ "Employee": n, ...r }));
+                });
+            } else { rows = localData[emp].filter(r => mon === "ALL" || normalize(r.Month) === normalize(mon)); }
+            if (rows.length) {
+                const ws = XLSX.utils.json_to_sheet(rows);
+                applyStyles(ws);
+                XLSX.utils.book_append_sheet(wb, ws, "Performance");
+            } else return alert("No data found");
+        }
+        XLSX.writeFile(wb, `Report_${Date.now()}.xlsx`);
+        closeExportModal();
+    }
+
+    function applyStyles(ws) {
+        if (!ws['!ref']) return;
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const ref = XLSX.utils.encode_cell({ c: C, r: R });
+                if (!ws[ref]) continue;
+                ws[ref].s = {
+                    fill: R === 0 ? { fgColor: { rgb: "2563EB" } } : undefined,
+                    font: R === 0 ? { color: { rgb: "FFFFFF" }, bold: true } : { color: { rgb: "000000" } },
+                    alignment: { horizontal: "center" },
+                    border: { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"}}
+                };
+            }
+        }
+        ws['!cols'] = Array(12).fill({wch: 20});
+    }
+
+    document.querySelectorAll('.editable').forEach(el => {
+        el.addEventListener('input', () => {
+            document.getElementById('saveBar').classList.add('active');
+            document.getElementById('borderEffect').classList.add('editing');
+            validateFields();
+        });
+    });
+    init();
+</script>
+</body>
+</html>
